@@ -1,9 +1,0 @@
----
-type: Changed
-# type: Added
-# type: Changed
-# type: Removed
-# type: Security
-# private: true
-description: |
-  Typescript bindings are generated with tsc

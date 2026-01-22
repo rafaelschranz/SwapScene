@@ -1,8 +1,0 @@
----
-type: Added
-# type: Changed
-# type: Removed
-# type: Security
-# private: true
-description: |
-  Resources are now chunked to 4MB for better caching performance and download restart.

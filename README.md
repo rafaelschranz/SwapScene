@@ -1,42 +1,43 @@
-# Background Removal in the Browser & Node.js
+# PortraitStudio 📸
 
-### 🚨 We are hiring 🚨
+Privacy-first background removal and replacement powered by AI.
 
-We are always looking for great people at IMG.LY. If you are working with our background removal library you might be a perfect fit! **Apply now at [IMG.LY Careers](https://img.ly/company/careers/?utm_source=github&utm_medium=readme&utm_campaign=background-removal-js)**
+## Features
 
-<p align="center">
-<img src="https://storage.googleapis.com/imgly-static-assets/static/blog/github-releases/background-removal-free-plugin-app.jpg" alt="background removal js showcase" />
+- 🔒 **100% Privacy**: All processing happens locally in your browser
+- 🎨 **AI-Powered**: Uses @imgly/background-removal for accurate cutouts
+- ⚡ **Fast**: Direct CDN loading for WASM/ONNX models
+- 🎭 **Fun UX**: Entertaining processing messages and smooth animations
+- 📦 **500x500 Output**: Perfect square format ready to use
 
-</p>
+## Quick Start
 
-Remove backgrounds from images directly in the browser or Node.js environment with ease and no additional costs or privacy concerns.
-Explore an [interactive demo](https://img.ly/showcases/cesdk/web/background-removal/web?utm_source=github&utm_medium=project&utm_campaign=background-removal-js).
+```bash
+# Install dependencies
+npm install
 
-## Overview
+# Start development server
+npm run dev
 
-`@imgly/background-removal` is a powerful npm package that allows developers to seamlessly remove the background from images directly in the browser.
+# Build for production
+npm run build
+```
 
-`@imgly/background-removal-node` is a powerful npm package that allows developers to remove the background from images in Node.js.
+## Tech Stack
 
-With its unique features and capabilities, this package offers an innovative and cost-effective solution for background removal tasks without compromising data privacy.
+- **React 18** - UI framework
+- **Vite** - Build tool
+- **Tailwind CSS** - Styling
+- **@imgly/background-removal** - AI background removal
 
-## Who is it for?
+## How It Works
 
-`@imgly/background-removal` is ideal for developers and projects that require efficient and cost-effective background removal directly in the browser or Node.js. It caters to a wide range of use cases, including but not limited to:
+1. Upload a portrait image
+2. AI removes the background locally
+3. Composites with predefined background
+4. Outputs a 500x500px PNG
+5. Download and enjoy!
 
-- _E-commerce applications_ that need to remove backgrounds from product images in real time.
+## Privacy
 
-- _Image editing applications_ that require background removal capabilities for enhancing user experience.
-
-- _Web-based graphic design tools_ that aim to simplify the creative process with in-browser background removal.
-
-Whether you are a professional developer or a hobbyist, `@imgly/background-removal` empowers you to deliver impressive applications and services with ease.
-
-## License
-
-The software is free for use under the AGPL License. Please contact [support@img.ly](mailto:support@img.ly?subject=Background-Removal%20License) for questions about other licensing options.
-
-## Authors & Contributors
-
-This library is made by IMG.LY shipping the world's premier SDKs for building creative applications.
-Start your trial of the [CreativeEditor SDK](https://img.ly/products/creative-sdk?utm_source=github&utm_medium=project&utm_campaign=background-removal-js), [PhotoEditor SDK](https://img.ly/products/photo-sdk?utm_source=github&utm_medium=project&utm_campaign=background-removal-js) & [VideoEditor SDK](https://img.ly/products/video-sdk?utm_source=github&utm_medium=project&utm_campaign=background-removal-js).
+No images are ever sent to any server. All AI inference happens directly in your browser using WebAssembly and ONNX Runtime.
