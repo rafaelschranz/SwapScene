@@ -4,7 +4,7 @@ const BACKGROUND_COLOR = '#66a6d7';
 const OUTPUT_SIZE = 500;
 
 function App() {
-  const [processedImage, setProcessedImage] = useState(null);
+  const [processedImages, setProcessedImages] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState('');
   const [progressPercent, setProgressPercent] = useState(0);
@@ -39,109 +39,148 @@ function App() {
   }, []);
 
   const handleFileUpload = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
 
-    if (!file.type.startsWith('image/')) {
-      setError('Please upload a valid image file');
+    const imageFiles = files.filter((file) => file.type.startsWith('image/'));
+
+    if (!imageFiles.length) {
+      setError('Bitte laden Sie mindestens eine gültige Bilddatei hoch');
       return;
     }
 
     setError(null);
-    setProcessedImage(null);
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      processImage(e.target.result);
-    };
-    reader.readAsDataURL(file);
-  };
+    setProcessedImages([]);
 
-  const processImage = async (imageSrc) => {
     setIsProcessing(true);
-    setProgress('Preparing AI model...');
+    setProgress('KI-Modell wird vorbereitet...');
     setProgressPercent(0);
-    setError(null);
 
     try {
-      const { removeBackground } = await import('@imgly/background-removal');
+      const total = imageFiles.length;
+      const results = [];
 
-      const blob = await removeBackground(imageSrc, {
-        progress: (key, current, total) => {
-          const percent = Math.round((current / total) * 100);
+      for (let index = 0; index < total; index++) {
+        const file = imageFiles[index];
+
+        const imageSrc = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'));
+          reader.readAsDataURL(file);
+        });
+
+        setProgress(`Bild ${index + 1} von ${total} wird verarbeitet...`);
+
+        const outputDataUrl = await processImage(imageSrc, (key, current, totalSteps) => {
+          let stepProgress = current / totalSteps;
+          // The library reports two stages: fetching and inference
+          // We can weigh them 50/50 for the progress of a single image
           if (key.includes('fetch')) {
-            setProgress(`Downloading model... ${percent}%`);
-            // Map fetch progress to 0-40% of the bar
-            setProgressPercent(Math.min(40, Math.round(0.4 * percent)));
+            stepProgress = stepProgress * 0.5;
           } else if (key.includes('inference')) {
-            setProgress(`Processing image... ${percent}%`);
-            // Map inference progress to 40-100% of the bar
-            setProgressPercent(40 + Math.round(0.6 * percent));
+            stepProgress = 0.5 + stepProgress * 0.5;
           }
-        }
-      });
 
-      const cutoutUrl = URL.createObjectURL(blob);
-      const cutoutImg = new Image();
-      
-      cutoutImg.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = OUTPUT_SIZE;
-        canvas.height = OUTPUT_SIZE;
-        const ctx = canvas.getContext('2d');
+          const imageProgress = stepProgress;
+          const overallProgress = ((index + imageProgress) / total) * 100;
+          setProgressPercent(Math.min(100, overallProgress));
+        });
 
-        ctx.fillStyle = BACKGROUND_COLOR;
-        ctx.fillRect(0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
+        results.push({
+          id: `${Date.now()}-${index}`,
+          name: file.name,
+          dataUrl: outputDataUrl,
+        });
+      }
 
-        const cutoutAspect = cutoutImg.width / cutoutImg.height;
-        let cutoutWidth, cutoutHeight, cutoutX, cutoutY;
-        
-        if (cutoutAspect > 1) {
-          cutoutHeight = OUTPUT_SIZE;
-          cutoutWidth = OUTPUT_SIZE * cutoutAspect;
-        } else {
-          cutoutWidth = OUTPUT_SIZE;
-          cutoutHeight = OUTPUT_SIZE / cutoutAspect;
-        }
-
-        cutoutX = (OUTPUT_SIZE - cutoutWidth) / 2;
-        cutoutY = (OUTPUT_SIZE - cutoutHeight) / 2;
-
-        ctx.drawImage(cutoutImg, cutoutX, cutoutY, cutoutWidth, cutoutHeight);
-
-        setProcessedImage(canvas.toDataURL('image/png'));
-        setIsProcessing(false);
-        setProgressPercent(100);
-        URL.revokeObjectURL(cutoutUrl);
-      };
-
-      cutoutImg.onerror = () => {
-        setError('Could not process image');
-        setIsProcessing(false);
-        setProgressPercent(0);
-        URL.revokeObjectURL(cutoutUrl);
-      };
-
-      cutoutImg.src = cutoutUrl;
-
+      setProcessedImages(results);
+      setIsProcessing(false);
+      setProgress('Alle Bilder erfolgreich verarbeitet');
+      setProgressPercent(100);
     } catch (err) {
-      console.error('Error:', err);
-      setError('Could not remove background. Please try another image.');
+      console.error('Error while processing images:', err);
+      setError('Ein oder mehrere Bilder konnten nicht verarbeitet werden. Bitte versuchen Sie es erneut.');
       setIsProcessing(false);
       setProgressPercent(0);
     }
   };
 
+  const processImage = async (imageSrc, onInternalProgress) => {
+    try {
+      const { removeBackground } = await import('@imgly/background-removal');
+
+      const blob = await removeBackground(imageSrc, {
+        progress: (key, current, total) => {
+          if (onInternalProgress) {
+            onInternalProgress(key, current, total);
+          }
+        }
+      });
+
+      const cutoutUrl = URL.createObjectURL(blob);
+
+      const outputDataUrl = await new Promise((resolve, reject) => {
+        const cutoutImg = new Image();
+
+        cutoutImg.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = OUTPUT_SIZE;
+          canvas.height = OUTPUT_SIZE;
+          const ctx = canvas.getContext('2d');
+
+          ctx.fillStyle = BACKGROUND_COLOR;
+          ctx.fillRect(0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
+
+          const cutoutAspect = cutoutImg.width / cutoutImg.height;
+          let cutoutWidth, cutoutHeight, cutoutX, cutoutY;
+
+          if (cutoutAspect > 1) {
+            cutoutHeight = OUTPUT_SIZE;
+            cutoutWidth = OUTPUT_SIZE * cutoutAspect;
+          } else {
+            cutoutWidth = OUTPUT_SIZE;
+            cutoutHeight = OUTPUT_SIZE / cutoutAspect;
+          }
+
+          cutoutX = (OUTPUT_SIZE - cutoutWidth) / 2;
+          cutoutY = (OUTPUT_SIZE - cutoutHeight) / 2;
+
+          ctx.drawImage(cutoutImg, cutoutX, cutoutY, cutoutWidth, cutoutHeight);
+
+          resolve(canvas.toDataURL('image/png'));
+          URL.revokeObjectURL(cutoutUrl);
+        };
+
+        cutoutImg.onerror = () => {
+          URL.revokeObjectURL(cutoutUrl);
+          reject(new Error('Bild konnte nicht verarbeitet werden'));
+        };
+
+        cutoutImg.src = cutoutUrl;
+      });
+
+      return outputDataUrl;
+    } catch (err) {
+      console.error('Error:', err);
+      setError('Hintergrund konnte nicht entfernt werden. Bitte versuchen Sie es erneut.');
+      throw err;
+    }
+  };
+
   const handleDownload = () => {
-    if (!processedImage) return;
-    const link = document.createElement('a');
-    link.download = `portraitstudio-${Date.now()}.png`;
-    link.href = processedImage;
-    link.click();
+    if (!processedImages.length) return;
+
+    processedImages.forEach((image, index) => {
+      const link = document.createElement('a');
+      link.download = `portraitstudio-${index + 1}-${Date.now()}.png`;
+      link.href = image.dataUrl;
+      link.click();
+    });
   };
 
   const handleReset = () => {
-    setProcessedImage(null);
+    setProcessedImages([]);
     setError(null);
     setProgress('');
     setProgressPercent(0);
@@ -153,14 +192,14 @@ function App() {
       <div style={{ maxWidth: '512px', margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '8px' }}>📸 PortraitStudio</h1>
-          <p style={{ color: '#6b7280' }}>Remove backgrounds instantly with AI</p>
+          <p style={{ color: '#6b7280' }}>Hintergründe sofort mit KI entfernen</p>
         </div>
 
         <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '4px' }}>Upload Image</h2>
-          <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '16px' }}>Select a portrait photo to remove the background</p>
+          <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '4px' }}>Bild hochladen</h2>
+          <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '16px' }}>Wählen Sie ein oder mehrere Porträtfotos aus, um den Hintergrund zu entfernen</p>
 
-          {!processedImage && !isProcessing && (
+          {processedImages.length === 0 && !isProcessing && (
             <label
               htmlFor="file-upload"
               style={{
@@ -179,13 +218,14 @@ function App() {
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '40px', marginBottom: '8px' }}>📤</div>
                 <p style={{ color: '#6b7280', marginBottom: '4px' }}>
-                  <span style={{ fontWeight: '600' }}>Click to upload</span> or drag & drop
+                  <span style={{ fontWeight: '600' }}>Zum Hochladen klicken</span> oder per Drag & Drop
                 </p>
-                <p style={{ color: '#9ca3af', fontSize: '12px' }}>PNG, JPG or WEBP</p>
+                <p style={{ color: '#9ca3af', fontSize: '12px' }}>PNG, JPG oder WEBP</p>
               </div>
               <input
                 id="file-upload"
                 type="file"
+                multiple
                 ref={fileInputRef}
                 onChange={handleFileUpload}
                 accept="image/*"
@@ -227,14 +267,19 @@ function App() {
             </div>
           )}
 
-          {processedImage && !isProcessing && (
+          {processedImages.length > 0 && !isProcessing && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-                <img
-                  src={processedImage}
-                  alt="Processed result"
-                  style={{ borderRadius: '8px', border: '1px solid #e5e7eb', maxWidth: '100%' }}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+                {processedImages.map((image) => (
+                  <div key={image.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                    <img
+                      src={image.dataUrl}
+                      alt={image.name || 'Processed result'}
+                      style={{ borderRadius: '8px', border: '1px solid #e5e7eb', width: '100%' }}
+                    />
+                    <p style={{ fontSize: '12px', color: '#6b7280', textAlign: 'center', wordBreak: 'break-word' }}>{image.name}</p>
+                  </div>
+                ))}
               </div>
               
               <div style={{ display: 'flex', gap: '12px' }}>
@@ -255,7 +300,7 @@ function App() {
                     gap: '8px'
                   }}
                 >
-                  ⬇️ Download
+                  ⬇️ Alle herunterladen
                 </button>
                 <button
                   onClick={handleReset}
@@ -273,7 +318,7 @@ function App() {
                     gap: '8px'
                   }}
                 >
-                  🔄 New Image
+                  🔄 Neue Bilder
                 </button>
               </div>
             </div>
@@ -282,7 +327,7 @@ function App() {
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '24px', color: '#9ca3af', fontSize: '12px' }}>
           <span>🔒</span>
-          <span>All processing happens locally in your browser</span>
+          <span>Die gesamte Verarbeitung findet lokal in Ihrem Browser statt</span>
         </div>
       </div>
     </div>
