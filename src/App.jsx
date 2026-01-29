@@ -100,6 +100,7 @@ function App() {
       setProgressPercent(100);
     } catch (err) {
       console.error('Error while processing images:', err);
+      console.error('Error details:', err.message, err.stack);
       setError('Ein oder mehrere Bilder konnten nicht verarbeitet werden. Bitte versuchen Sie es erneut.');
       setIsProcessing(false);
       setProgressPercent(0);
@@ -111,7 +112,9 @@ function App() {
       const { removeBackground } = await import('@imgly/background-removal');
 
       const blob = await removeBackground(imageSrc, {
+        debug: true,
         progress: (key, current, total) => {
+          console.log(`Background removal progress: ${key} - ${current}/${total}`);
           if (onInternalProgress) {
             onInternalProgress(key, current, total);
           }
@@ -162,8 +165,8 @@ function App() {
 
       return outputDataUrl;
     } catch (err) {
-      console.error('Error:', err);
-      setError('Hintergrund konnte nicht entfernt werden. Bitte versuchen Sie es erneut.');
+      console.error('Error in processImage:', err);
+      console.error('Error details:', err.message, err.stack);
       throw err;
     }
   };

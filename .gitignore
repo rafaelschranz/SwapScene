@@ -6,3 +6,6 @@ tmp
 .vscode
 .parcel-cache
 .env
+
+# Downloaded assets
+public/assets
