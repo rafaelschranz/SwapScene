@@ -9,6 +9,7 @@ function App() {
   const [progress, setProgress] = useState('');
   const [progressPercent, setProgressPercent] = useState(0);
   const [error, setError] = useState(null);
+  const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef(null);
 
   // Preload the (small, faster) background removal model in the background
@@ -42,6 +43,10 @@ function App() {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
 
+    await processFiles(files);
+  };
+
+  const processFiles = async (files) => {
     const imageFiles = files.filter((file) => file.type.startsWith('image/'));
 
     if (!imageFiles.length) {
@@ -104,6 +109,29 @@ function App() {
       setError('Ein oder mehrere Bilder konnten nicht verarbeitet werden. Bitte versuchen Sie es erneut.');
       setIsProcessing(false);
       setProgressPercent(0);
+    }
+  };
+
+  const handleDragOver = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragOver(false);
+    
+    const files = Array.from(event.dataTransfer.files);
+    if (files.length) {
+      processFiles(files);
     }
   };
 
@@ -205,6 +233,9 @@ function App() {
           {processedImages.length === 0 && !isProcessing && (
             <label
               htmlFor="file-upload"
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
               style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -212,16 +243,17 @@ function App() {
                 justifyContent: 'center',
                 width: '100%',
                 height: '192px',
-                border: '2px dashed #e5e7eb',
+                border: `2px dashed ${isDragOver ? '#3b82f6' : '#e5e7eb'}`,
                 borderRadius: '8px',
                 cursor: 'pointer',
-                transition: 'background-color 0.2s'
+                transition: 'all 0.2s',
+                backgroundColor: isDragOver ? '#eff6ff' : 'transparent'
               }}
             >
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '40px', marginBottom: '8px' }}>📤</div>
-                <p style={{ color: '#6b7280', marginBottom: '4px' }}>
-                  <span style={{ fontWeight: '600' }}>Zum Hochladen klicken</span> oder per Drag & Drop
+                <div style={{ fontSize: '40px', marginBottom: '8px' }}>{isDragOver ? '📥' : '📤'}</div>
+                <p style={{ color: isDragOver ? '#3b82f6' : '#6b7280', marginBottom: '4px', fontWeight: isDragOver ? '600' : 'normal' }}>
+                  <span style={{ fontWeight: '600' }}>{isDragOver ? 'Dateien hier ablegen' : 'Zum Hochladen klicken'}</span> {!isDragOver && 'oder per Drag & Drop'}
                 </p>
                 <p style={{ color: '#9ca3af', fontSize: '12px' }}>PNG, JPG oder WEBP</p>
               </div>
